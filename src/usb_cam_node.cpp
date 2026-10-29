@@ -202,7 +202,7 @@ void UsbCamNode::init()
 
   m_image_msg->header.frame_id = m_parameters.frame_id;
   RCLCPP_INFO(
-    this->get_logger(), "Starting '%s' (%s) at %dx%d via %s (%s) at %i FPS",
+    this->get_logger(), "Starting '%s' (%s) at %dx%d via %s (%s) at %.3f FPS",
     m_parameters.camera_name.c_str(), m_parameters.device_name.c_str(),
     m_parameters.image_width, m_parameters.image_height, m_parameters.io_method_name.c_str(),
     m_parameters.pixel_format_name.c_str(), m_parameters.framerate);
@@ -226,13 +226,17 @@ void UsbCamNode::init()
   m_camera->start();
 
   auto frame_rate = m_camera->get_frame_rate();
-  if (static_cast<size_t>(m_parameters.framerate) > frame_rate) {
+  if (m_parameters.framerate > frame_rate) {
     RCLCPP_WARN_STREAM(
       this->get_logger(),
-      "Desired framerate " << m_parameters.framerate << " is higher than the camera's capability " <<
+      "Desired framerate " << m_parameters.framerate <<
+        " is higher than the camera's capability " <<
         frame_rate << " fps");
     m_parameters.framerate = frame_rate;
   }
+  RCLCPP_INFO(
+    this->get_logger(), "Negotiated capture rate %.3f FPS; publication rate %.3f FPS",
+    frame_rate, m_parameters.framerate);
 
   // TODO(lucasw) should this check a little faster than expected frame rate?
   // TODO(lucasw) how to do small than ms, or fractional ms- std::chrono::nanoseconds?

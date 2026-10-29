@@ -108,7 +108,7 @@ typedef struct parameters_t
   std::string av_device_format;
   int image_width;
   int image_height;
-  int framerate;
+  double framerate;
   int brightness;
   int contrast;
   int saturation;
@@ -236,7 +236,7 @@ public:
     return m_image.height;
   }
 
-  inline size_t get_frame_rate()
+  inline double get_frame_rate()
   {
     return m_framerate;
   }
@@ -384,7 +384,7 @@ public:
     return m_image.pixel_format;
   }
 
-  inline size_t set_frame_rate(const parameters_t & parameters)
+  inline double set_frame_rate(const parameters_t & parameters)
   {
     std::shared_ptr<pixel_format_base> found_driver_format = nullptr;
 
@@ -413,12 +413,19 @@ public:
       );
     }
 
+    std::vector<v4l2_fract> intervals;
     for (auto fmt : this->supported_formats()) {
       if (fmt.v4l2_fmt.width == static_cast<size_t>(parameters.image_width) &&
         fmt.v4l2_fmt.height == static_cast<size_t>(parameters.image_height) &&
-        fmt.v4l2_fmt.pixel_format == found_driver_format->v4l2()) {
-        return fmt.v4l2_fmt.discrete.denominator / fmt.v4l2_fmt.discrete.numerator;
+        fmt.v4l2_fmt.pixel_format == found_driver_format->v4l2())
+      {
+        intervals.push_back(fmt.v4l2_fmt.discrete);
       }
+    }
+
+    if (!intervals.empty()) {
+      m_frame_interval = utils::select_frame_interval(parameters.framerate, intervals);
+      return static_cast<double>(m_frame_interval.denominator) / m_frame_interval.numerator;
     }
 
     throw std::invalid_argument(
@@ -450,7 +457,8 @@ private:
   image_t m_image;
 
   bool m_is_capturing;
-  int m_framerate;
+  double m_framerate;
+  v4l2_fract m_frame_interval{};
   const time_t m_epoch_time_shift_us;
   std::vector<capture_format_t> m_supported_formats;
 };

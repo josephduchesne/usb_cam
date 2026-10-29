@@ -46,6 +46,8 @@ extern "C" {
 #include <iostream>
 #include <string>
 #include <map>
+#include <stdexcept>
+#include <vector>
 
 #include "linux/videodev2.h"
 
@@ -77,6 +79,36 @@ struct buffer
   char * start;
   size_t length;
 };
+
+inline v4l2_fract select_frame_interval(
+  double requested_rate, const std::vector<v4l2_fract> & intervals)
+{
+  if (!std::isfinite(requested_rate) || requested_rate <= 0) {
+    throw std::invalid_argument("Requested camera framerate must be positive and finite");
+  }
+  v4l2_fract selected{};
+  v4l2_fract fastest{};
+  double selected_rate = 0;
+  double fastest_rate = 0;
+  for (const auto & interval : intervals) {
+    if (interval.numerator == 0 || interval.denominator == 0) {
+      continue;
+    }
+    const double rate = static_cast<double>(interval.denominator) / interval.numerator;
+    if (rate > fastest_rate) {
+      fastest = interval;
+      fastest_rate = rate;
+    }
+    if (rate >= requested_rate && (selected_rate == 0 || rate < selected_rate)) {
+      selected = interval;
+      selected_rate = rate;
+    }
+  }
+  if (fastest_rate == 0) {
+    throw std::invalid_argument("No valid camera frame intervals for the requested format");
+  }
+  return selected_rate > 0 ? selected : fastest;
+}
 
 
 /// @brief Get epoch time shift in microseconds

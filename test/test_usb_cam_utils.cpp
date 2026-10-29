@@ -37,6 +37,30 @@
 
 using usb_cam::utils::io_method_from_string;
 
+TEST(test_usb_cam_utils, selects_lowest_sufficient_capture_rate) {
+  const std::vector<v4l2_fract> intervals{{1, 30}, {1, 10}, {1, 5}, {1, 2}};
+  EXPECT_EQ(usb_cam::utils::select_frame_interval(5, intervals).denominator, 5U);
+  EXPECT_EQ(usb_cam::utils::select_frame_interval(3, intervals).denominator, 5U);
+  EXPECT_EQ(usb_cam::utils::select_frame_interval(1, intervals).denominator, 2U);
+  EXPECT_EQ(usb_cam::utils::select_frame_interval(60, intervals).denominator, 30U);
+}
+
+TEST(test_usb_cam_utils, preserves_fractional_capture_intervals) {
+  const auto interval = usb_cam::utils::select_frame_interval(29, {{1001, 30000}, {1, 60}});
+  EXPECT_EQ(interval.numerator, 1001U);
+  EXPECT_EQ(interval.denominator, 30000U);
+}
+
+TEST(test_usb_cam_utils, rejects_invalid_capture_rates_and_intervals) {
+  EXPECT_THROW(usb_cam::utils::select_frame_interval(0, {{1, 30}}), std::invalid_argument);
+  EXPECT_THROW(usb_cam::utils::select_frame_interval(-1, {{1, 30}}), std::invalid_argument);
+  EXPECT_THROW(usb_cam::utils::select_frame_interval(INFINITY, {{1, 30}}), std::invalid_argument);
+  EXPECT_THROW(usb_cam::utils::select_frame_interval(NAN, {{1, 30}}), std::invalid_argument);
+  EXPECT_THROW(usb_cam::utils::select_frame_interval(5, {}), std::invalid_argument);
+  EXPECT_THROW(usb_cam::utils::select_frame_interval(5, {{0, 30}, {1, 0}}), std::invalid_argument);
+  EXPECT_EQ(usb_cam::utils::select_frame_interval(5, {{0, 30}, {1, 5}}).denominator, 5U);
+}
+
 
 TEST(test_usb_cam_utils, test_io_method_from_string) {
   usb_cam::utils::io_method_t test_io;
